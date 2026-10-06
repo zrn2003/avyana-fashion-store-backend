@@ -7,11 +7,25 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting database seed for Boutique Fashion Platform...');
 
-  // 1. Ensure Store Owner Admin Account
+  // 1. Ensure Store Owner Admin Accounts
   const adminPasswordHash = await bcrypt.hash('Admin@12345', 12);
   const adminUser = await prisma.user.upsert({
+    where: { email: 'admin@gmail.com' },
+    update: { role: Role.ADMIN, passwordHash: adminPasswordHash },
+    create: {
+      fullName: 'Boutique Store Admin',
+      email: 'admin@gmail.com',
+      passwordHash: adminPasswordHash,
+      role: Role.ADMIN,
+      authProvider: AuthProvider.LOCAL,
+      isEmailVerified: true,
+    },
+  });
+  console.log(`✅ Store owner admin verified: ${adminUser.email}`);
+
+  await prisma.user.upsert({
     where: { email: 'zishaninfo20@gmail.com' },
-    update: { role: Role.ADMIN },
+    update: { role: Role.ADMIN, passwordHash: adminPasswordHash },
     create: {
       fullName: 'Zishan Nadaf (Store Owner)',
       email: 'zishaninfo20@gmail.com',
@@ -21,7 +35,6 @@ async function main() {
       isEmailVerified: true,
     },
   });
-  console.log(`✅ Store owner admin verified: ${adminUser.email}`);
 
   // 2. Categories
   const categoriesData = [
