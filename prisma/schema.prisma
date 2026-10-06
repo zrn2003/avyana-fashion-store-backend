@@ -1,0 +1,282 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+}
+
+enum OrderStatus {
+  PLACED
+  CONFIRMED
+  PACKED
+  SHIPPED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  COD
+  DIRECT_UPI
+  ONLINE_GATEWAY
+}
+
+enum PaymentStatus {
+  PENDING
+  VERIFIED
+  FAILED
+  REFUNDED
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+model User {
+  id              String         @id @default(cuid())
+  fullName        String
+  email           String         @unique
+  phone           String?        @unique
+  passwordHash    String?
+  authProvider    AuthProvider   @default(LOCAL)
+  googleId        String?        @unique
+  avatarUrl       String?
+  isEmailVerified Boolean        @default(false)
+  role            Role           @default(CUSTOMER)
+  
+  refreshTokens   RefreshToken[]
+  addresses       Address[]
+  orders          Order[]
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Address {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  receiverName String
+  phone        String
+  streetLine1  String
+  streetLine2  String?
+  city         String
+  state        String
+  pincode      String
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  orders       Order[]
+
+  @@index([userId])
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  imageUrl    String?
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+}
+
+model Product {
+  id          String           @id @default(cuid())
+  categoryId  String
+  category    Category         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  title       String
+  slug        String           @unique
+  description String
+  fabricCare  String?
+  basePrice   Float
+  salePrice   Float?
+  isActive    Boolean          @default(true)
+  isFeatured  Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  images      ProductImage[]
+  variants    ProductVariant[]
+
+  @@index([categoryId])
+  @@index([isActive])
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  r2Key     String
+  publicUrl String
+  altText   String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+}
+
+model ProductVariant {
+  id         String      @id @default(cuid())
+  productId  String
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku        String      @unique
+  size       String
+  colorName  String
+  colorHex   String?
+  stockCount Int         @default(0)
+  priceDelta Float       @default(0.0)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  orderItems OrderItem[]
+
+  @@unique([productId, size, colorName])
+  @@index([productId])
+}
+
+model Order {
+  id              String               @id @default(cuid())
+  orderNumber     String               @unique
+  userId          String?
+  user            User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  addressId       String?
+  address         Address?             @relation(fields: [addressId], references: [id], onDelete: SetNull)
+
+  // Snapshotted Customer & Delivery Details (1NF normalized)
+  shippingName    String
+  shippingPhone   String
+  shippingAddress String               // Serialized JSON snapshot for full backwards compatibility
+  shippingStreet  String?
+  shippingCity    String?
+  shippingState   String?
+  shippingPincode String?
+
+  // Financial snapshot
+  subtotal        Float
+  shippingFee     Float                @default(0.0)
+  discountTotal   Float                @default(0.0)
+  totalAmount     Float
+
+  // Payment State
+  paymentMethod   PaymentMethod        @default(COD)
+  paymentStatus   PaymentStatus        @default(PENDING)
+  upiUtrNumber    String?
+  upiReceiptR2Key String?
+
+  // Fulfillment & Logistics
+  orderStatus     OrderStatus          @default(PLACED)
+  adminNotes      String?
+  courierName     String?
+  trackingAwb     String?
+  trackingUrl     String?
+  dispatchedAt    DateTime?
+  deliveredAt     DateTime?
+
+  items           OrderItem[]
+  transactions    PaymentTransaction[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([userId])
+  @@index([addressId])
+  @@index([shippingPhone])
+  @@index([orderStatus])
+  @@index([paymentStatus])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id             String         @id @default(cuid())
+  orderId        String
+  order          Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variantId      String
+  variant        ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  productTitle   String
+  variantDetails String
+  sku            String
+  unitPrice      Float
+  quantity       Int
+  lineTotal      Float
+
+  @@index([orderId])
+  @@index([variantId])
+}
+
+model PaymentTransaction {
+  id               String            @id @default(cuid())
+  orderId          String
+  order            Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  gateway          String            @default("RAZORPAY")
+  gatewayPaymentId String?
+  gatewayOrderId   String?
+  gatewaySignature String?
+  amount           Float
+  currency         String            @default("INR")
+  status           TransactionStatus @default(PENDING)
+  rawPayload       String?
+  errorMessage     String?
+  createdAt        DateTime          @default(now())
+
+  @@index([orderId])
+  @@index([gatewayPaymentId])
+  @@index([status])
+}
+
+model MediaAsset {
+  id        String   @id @default(cuid())
+  r2Key     String   @unique
+  publicUrl String
+  filename  String
+  fileType  String
+  fileSize  Int?
+  folder    String   @default("products")
+  altText   String?
+  createdAt DateTime @default(now())
+
+  @@index([folder])
+}
+
+model StoreSetting {
+  id                    String   @id @default("default")
+  storeName             String   @default("Avyana Craft")
+  supportEmail          String   @default("care@avyanacraft.com")
+  supportPhone          String   @default("+91 98220 12345")
+  whatsappNumber        String   @default("+919822012345")
+  upiVpa                String   @default("avyanacraft@okaxis")
+  upiPayeeName          String   @default("AVYANA CRAFT")
+  codFee                Float    @default(50.0)
+  freeShippingThreshold Float    @default(1499.0)
+  standardShippingFee   Float    @default(99.0)
+  announcementText      String?  @default("Complimentary Express Delivery on orders above ₹1,499 | Handcrafted Festive Silks")
+  isAnnouncementActive  Boolean  @default(true)
+  updatedAt             DateTime @updatedAt
+}
+

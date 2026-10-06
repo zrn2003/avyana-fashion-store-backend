@@ -1,0 +1,46 @@
+services:
+  - type: web
+    name: avyana-craft-backend
+    runtime: node
+    region: singapore
+    plan: free
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "1"
+      - key: CORS_ORIGIN
+        value: "https://*.vercel.app,http://localhost:5173"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_EXPIRY
+        value: "15m"
+      - key: JWT_REFRESH_EXPIRY
+        value: "7d"
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: BOUTIQUE_NAME
+        value: "Avyana Craft"
+      - key: BOUTIQUE_UPI_VPA
+        value: "avyanacraft@okaxis"
+      - key: FREE_SHIPPING_THRESHOLD
+        value: "1499.00"
+      - key: COD_SURCHARGE_FEE
+        value: "0.00"
+      - key: RATE_LIMIT_GLOBAL_MAX
+        value: "1000"
+      - key: RATE_LIMIT_AUTH_MAX
+        value: "15"
+      - key: RATE_LIMIT_ORDER_MAX
+        value: "10"
+      - key: RATE_LIMIT_MEDIA_MAX
+        value: "30"
