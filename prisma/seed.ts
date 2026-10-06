@@ -7,54 +7,21 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting database seed for Boutique Fashion Platform...');
 
-  // 1. Create Default Users (Store Owner Admin + Test Customer)
+  // 1. Ensure Store Owner Admin Account
   const adminPasswordHash = await bcrypt.hash('Admin@12345', 12);
   const adminUser = await prisma.user.upsert({
-    where: { email: 'admin@boutique.com' },
-    update: {},
+    where: { email: 'zishaninfo20@gmail.com' },
+    update: { role: Role.ADMIN },
     create: {
-      fullName: 'Meera Sharma (Store Owner)',
-      email: 'admin@boutique.com',
-      phone: '9876500001',
+      fullName: 'Zishan Nadaf (Store Owner)',
+      email: 'zishaninfo20@gmail.com',
       passwordHash: adminPasswordHash,
       role: Role.ADMIN,
       authProvider: AuthProvider.LOCAL,
       isEmailVerified: true,
     },
   });
-  console.log(`✅ Admin user seeded: ${adminUser.email}`);
-
-  const customerPasswordHash = await bcrypt.hash('Password123!', 12);
-  const customerUser = await prisma.user.upsert({
-    where: { email: 'priya@example.com' },
-    update: {},
-    create: {
-      fullName: 'Priya Sharma',
-      email: 'priya@example.com',
-      phone: '9876543210',
-      passwordHash: customerPasswordHash,
-      role: Role.CUSTOMER,
-      authProvider: AuthProvider.LOCAL,
-      isEmailVerified: true,
-    },
-  });
-  console.log(`✅ Test customer seeded: ${customerUser.email}`);
-
-  // Seed default address for customer
-  await prisma.address.deleteMany({ where: { userId: customerUser.id } });
-  await prisma.address.create({
-    data: {
-      userId: customerUser.id,
-      receiverName: 'Priya Sharma',
-      phone: '9876543210',
-      streetLine1: 'Flat 402, Lotus Residency',
-      streetLine2: 'Near Shivaji Park',
-      city: 'Pune',
-      state: 'Maharashtra',
-      pincode: '411005',
-      isDefault: true,
-    },
-  });
+  console.log(`✅ Store owner admin verified: ${adminUser.email}`);
 
   // 2. Categories
   const categoriesData = [
