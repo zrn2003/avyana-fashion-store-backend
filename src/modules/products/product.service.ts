@@ -428,56 +428,43 @@ export class ProductService {
       .replace(/(^-|-$)+/g, '');
     const slug = `${baseSlug}-${Date.now().toString(36)}`;
 
-    const newProduct = await prisma.$transaction(async (tx) => {
-      const product = await tx.product.create({
-        data: {
-          ...prodData,
-          slug,
-          categoryId,
-        },
-      });
-
-      // Insert Images
-      if (images && images.length > 0) {
-        for (let i = 0; i < images.length; i++) {
-          const img = images[i];
-          await tx.productImage.create({
-            data: {
-              productId: product.id,
-              publicUrl: img.publicUrl,
-              r2Key: img.r2Key || `products/${product.id}-${i}.webp`,
-              altText: img.altText || `${product.title} image`,
-              sortOrder: img.sortOrder ?? i,
-            },
-          });
-        }
-      }
-
-      // Insert Variants
-      if (variants && variants.length > 0) {
-        for (const v of variants) {
-          await tx.productVariant.create({
-            data: {
-              productId: product.id,
-              sku: v.sku,
-              size: v.size,
-              colorName: v.colorName,
-              colorHex: v.colorHex || '#800020',
-              stockCount: Number(v.stockCount) || 0,
-              priceDelta: v.priceDelta ? Number(v.priceDelta) : 0,
-            },
-          });
-        }
-      }
-
-      return tx.product.findUnique({
-        where: { id: product.id },
-        include: {
-          category: true,
-          images: { orderBy: { sortOrder: 'asc' } },
-          variants: true,
-        },
-      });
+    const newProduct = await prisma.product.create({
+      data: {
+        ...prodData,
+        slug,
+        categoryId,
+        ...(images && images.length > 0
+          ? {
+              images: {
+                create: images.map((img: any, i: number) => ({
+                  publicUrl: img.publicUrl,
+                  r2Key: img.r2Key || `products/${slug}-${i}.webp`,
+                  altText: img.altText || `${prodData.title} image`,
+                  sortOrder: img.sortOrder ?? i,
+                })),
+              },
+            }
+          : {}),
+        ...(variants && variants.length > 0
+          ? {
+              variants: {
+                create: variants.map((v: any) => ({
+                  sku: v.sku,
+                  size: v.size,
+                  colorName: v.colorName,
+                  colorHex: v.colorHex || '#800020',
+                  stockCount: Number(v.stockCount) || 0,
+                  priceDelta: v.priceDelta ? Number(v.priceDelta) : 0,
+                })),
+              },
+            }
+          : {}),
+      },
+      include: {
+        category: true,
+        images: { orderBy: { sortOrder: 'asc' } },
+        variants: true,
+      },
     });
 
     return newProduct;
@@ -493,14 +480,15 @@ export class ProductService {
       throw error;
     }
 
-    const updated = await prisma.$transaction(async (tx) => {
-      await tx.product.update({
-        where: { id },
-        data: {
-          ...prodData,
-          ...(categoryId && { categoryId }),
-        },
-      });
+    const updated = await prisma.$transaction(
+      async (tx) => {
+        await tx.product.update({
+          where: { id },
+          data: {
+            ...prodData,
+            ...(categoryId && { categoryId }),
+          },
+        });
 
       // Update images if provided
       if (images && images.length > 0) {
@@ -578,6 +566,9 @@ export class ProductService {
           variants: true,
         },
       });
+    }, {
+      timeout: 20000,
+      maxWait: 10000,
     });
 
     return updated;
