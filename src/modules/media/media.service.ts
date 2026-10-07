@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { env } from '../../config/env';
 import crypto from 'crypto';
@@ -11,22 +11,56 @@ export interface PresignedUrlInput {
 
 export class MediaService {
   private static getS3Client(): S3Client | null {
+    // 1. Neon S3-Compatible Object Storage
     if (
-      !env.CLOUDFLARE_R2_ACCOUNT_ID ||
-      !env.CLOUDFLARE_R2_ACCESS_KEY_ID ||
-      !env.CLOUDFLARE_R2_SECRET_ACCESS_KEY
+      env.AWS_ENDPOINT_URL_S3 &&
+      env.AWS_ACCESS_KEY_ID &&
+      env.AWS_SECRET_ACCESS_KEY
     ) {
-      return null;
+      return new S3Client({
+        region: env.AWS_REGION || 'us-east-2',
+        endpoint: env.AWS_ENDPOINT_URL_S3,
+        credentials: {
+          accessKeyId: env.AWS_ACCESS_KEY_ID,
+          secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+        },
+        forcePathStyle: true,
+      });
     }
 
-    return new S3Client({
-      region: 'auto',
-      endpoint: `https://${env.CLOUDFLARE_R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-      credentials: {
-        accessKeyId: env.CLOUDFLARE_R2_ACCESS_KEY_ID,
-        secretAccessKey: env.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
-      },
-    });
+    // 2. Cloudflare R2 Media Storage Fallback
+    if (
+      env.CLOUDFLARE_R2_ACCOUNT_ID &&
+      env.CLOUDFLARE_R2_ACCESS_KEY_ID &&
+      env.CLOUDFLARE_R2_SECRET_ACCESS_KEY
+    ) {
+      return new S3Client({
+        region: 'auto',
+        endpoint: `https://${env.CLOUDFLARE_R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+        credentials: {
+          accessKeyId: env.CLOUDFLARE_R2_ACCESS_KEY_ID,
+          secretAccessKey: env.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+        },
+      });
+    }
+
+    return null;
+  }
+
+  private static getBucketName(): string {
+    if (env.AWS_ENDPOINT_URL_S3) {
+      return env.AWS_S3_BUCKET_NAME || 'fashion-store-data-img';
+    }
+    return env.CLOUDFLARE_R2_BUCKET_NAME || 'boutique-assets';
+  }
+
+  private static getPublicUrl(key: string): string {
+    if (env.AWS_ENDPOINT_URL_S3) {
+      const base = env.AWS_ENDPOINT_URL_S3.replace(/\/+$/, '');
+      const bucket = this.getBucketName();
+      return `${base}/${bucket}/${key}`;
+    }
+    return `${env.CLOUDFLARE_R2_PUBLIC_URL}/${key}`;
   }
 
   static async generatePresignedUrl(input: PresignedUrlInput) {
@@ -50,7 +84,7 @@ export class MediaService {
 
     if (!s3) {
       // Mock / Local Development Presigned URL fallback
-      console.log(`📢 [Cloudflare R2 Mock]: Generated simulated presigned URL for ${uniqueKey}`);
+      console.log(`📢 [Storage Mock]: Generated simulated presigned URL for ${uniqueKey}`);
       return {
         uploadUrl: `http://localhost:${env.PORT}/api/v1/media/mock-upload?key=${encodeURIComponent(uniqueKey)}`,
         publicUrl: `${env.CLOUDFLARE_R2_PUBLIC_URL}/${uniqueKey}`,
@@ -58,14 +92,15 @@ export class MediaService {
       };
     }
 
+    const bucket = this.getBucketName();
     const command = new PutObjectCommand({
-      Bucket: env.CLOUDFLARE_R2_BUCKET_NAME,
+      Bucket: bucket,
       Key: uniqueKey,
       ContentType: fileType,
     });
 
     const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 }); // 5 minutes (SRS-MED-01)
-    const publicUrl = `${env.CLOUDFLARE_R2_PUBLIC_URL}/${uniqueKey}`;
+    const publicUrl = this.getPublicUrl(uniqueKey);
 
     return {
       uploadUrl,
@@ -181,15 +216,41 @@ export class MediaService {
   static async deleteAsset(id: string) {
     const { prisma } = await import('../../config/prisma');
 
+    const s3 = this.getS3Client();
+
     // Check mediaAsset
     const asset = await (prisma as any).mediaAsset.findUnique({ where: { id } });
     if (asset) {
+      if (s3 && asset.r2Key) {
+        try {
+          await s3.send(
+            new DeleteObjectCommand({
+              Bucket: this.getBucketName(),
+              Key: asset.r2Key,
+            })
+          );
+        } catch (err) {
+          console.warn(`Failed to delete object ${asset.r2Key} from S3 storage:`, err);
+        }
+      }
       return (prisma as any).mediaAsset.delete({ where: { id } });
     }
 
     // Check productImage
     const img = await prisma.productImage.findUnique({ where: { id } });
     if (img) {
+      if (s3 && img.r2Key) {
+        try {
+          await s3.send(
+            new DeleteObjectCommand({
+              Bucket: this.getBucketName(),
+              Key: img.r2Key,
+            })
+          );
+        } catch (err) {
+          console.warn(`Failed to delete object ${img.r2Key} from S3 storage:`, err);
+        }
+      }
       return prisma.productImage.delete({ where: { id } });
     }
 
