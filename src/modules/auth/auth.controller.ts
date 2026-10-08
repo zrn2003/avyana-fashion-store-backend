@@ -4,10 +4,13 @@ import { sendSuccess, sendError } from '../../utils/response';
 import { getCookie } from '../../middleware/auth.middleware';
 
 const setAuthCookies = (res: Response, accessToken: string, refreshToken?: string) => {
+  const isProd = process.env.NODE_ENV === 'production';
+  const sameSiteMode = isProd ? ('none' as const) : ('lax' as const);
+
   res.cookie('boutique_access_token', accessToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: isProd,
+    sameSite: sameSiteMode,
     path: '/',
     maxAge: 15 * 60 * 1000, // 15 mins
   });
@@ -15,8 +18,8 @@ const setAuthCookies = (res: Response, accessToken: string, refreshToken?: strin
   if (refreshToken) {
     res.cookie('boutique_refresh_token', refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: isProd,
+      sameSite: sameSiteMode,
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
@@ -25,17 +28,19 @@ const setAuthCookies = (res: Response, accessToken: string, refreshToken?: strin
   // Client-readable indicator so frontend knows an active session exists before making /auth/me requests
   res.cookie('boutique_logged_in', 'true', {
     httpOnly: false,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: isProd,
+    sameSite: sameSiteMode,
     path: '/',
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 };
 
 const clearAuthCookies = (res: Response) => {
-  res.clearCookie('boutique_access_token', { path: '/' });
-  res.clearCookie('boutique_refresh_token', { path: '/' });
-  res.clearCookie('boutique_logged_in', { path: '/' });
+  const isProd = process.env.NODE_ENV === 'production';
+  const sameSiteMode = isProd ? ('none' as const) : ('lax' as const);
+  res.clearCookie('boutique_access_token', { path: '/', secure: isProd, sameSite: sameSiteMode });
+  res.clearCookie('boutique_refresh_token', { path: '/', secure: isProd, sameSite: sameSiteMode });
+  res.clearCookie('boutique_logged_in', { path: '/', secure: isProd, sameSite: sameSiteMode });
 };
 
 export class AuthController {
