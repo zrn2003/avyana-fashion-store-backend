@@ -5,7 +5,7 @@ import { env } from './config/env';
 import { prisma } from './config/prisma';
 import { sendSuccess, sendError } from './utils/response';
 import { errorHandler } from './middleware/error.middleware';
-import { globalRateLimiter } from './middleware/rateLimit.middleware';
+import { globalRateLimiter, unauthorizedAccessLimiter } from './middleware/rateLimit.middleware';
 import authRoutes from './modules/auth/auth.routes';
 import productRoutes from './modules/products/product.routes';
 import orderRoutes from './modules/orders/order.routes';
@@ -50,6 +50,9 @@ app.use(
 
 // Global Baseline Rate Limiting (1,000 req / 15m)
 app.use(globalRateLimiter);
+
+// Strict Security Guard: Lock out IPs with 5 unauthorized (401/403) attempts for 10 minutes
+app.use(unauthorizedAccessLimiter);
 
 // Body Parsers (with size restrictions to prevent payload bloat)
 app.use(express.json({ limit: '10mb' }));

@@ -39,7 +39,13 @@ services:
       - key: RATE_LIMIT_GLOBAL_MAX
         value: "1000"
       - key: RATE_LIMIT_AUTH_MAX
-        value: "15"
+        value: "5"
+      - key: RATE_LIMIT_AUTH_WINDOW_MINUTES
+        value: "10"
+      - key: RATE_LIMIT_UNAUTHORIZED_MAX
+        value: "5"
+      - key: RATE_LIMIT_UNAUTHORIZED_WINDOW_MINUTES
+        value: "10"
       - key: RATE_LIMIT_ORDER_MAX
         value: "10"
       - key: RATE_LIMIT_MEDIA_MAX
