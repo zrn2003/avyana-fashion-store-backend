@@ -25,6 +25,8 @@ router.get('/orders/my-orders', authenticate, OrderController.getMyOrders);
 // Admin Portal Endpoints
 router.get('/admin/overview', authenticate, requireRole(Role.ADMIN), OrderController.getAdminOverview);
 router.get('/admin/orders', authenticate, requireRole(Role.ADMIN), OrderController.listAdminOrders);
+router.get('/admin/orders/:id/receipt', authenticate, requireRole(Role.ADMIN), OrderController.getOrderReceipt);
+router.post('/admin/orders/receipt/render', authenticate, requireRole(Role.ADMIN), OrderController.renderCustomReceipt);
 router.patch(
   '/admin/orders/:id/fulfill',
   authenticate,

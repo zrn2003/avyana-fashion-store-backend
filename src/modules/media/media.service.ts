@@ -86,7 +86,7 @@ export class MediaService {
       // Mock / Local Development Presigned URL fallback
       console.log(`📢 [Storage Mock]: Generated simulated presigned URL for ${uniqueKey}`);
       return {
-        uploadUrl: `http://localhost:${env.PORT}/api/v1/media/mock-upload?key=${encodeURIComponent(uniqueKey)}`,
+        uploadUrl: `/api/v1/media/mock-upload?key=${encodeURIComponent(uniqueKey)}`,
         publicUrl: `${env.CLOUDFLARE_R2_PUBLIC_URL}/${uniqueKey}`,
         r2Key: uniqueKey,
       };

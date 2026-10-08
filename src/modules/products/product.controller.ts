@@ -5,16 +5,27 @@ import { sendSuccess } from '../../utils/response';
 export class ProductController {
   static async listProducts(req: Request, res: Response, next: NextFunction) {
     try {
-      const { page, limit, category, sort, search, isFeatured } = req.query;
+      const { page, limit, category, collection, tag, sort, search, isFeatured } = req.query;
       const result = await ProductService.listProducts({
         page: page ? Number(page) : undefined,
         limit: limit ? Number(limit) : undefined,
         category: category as string,
+        collection: collection as string,
+        tag: tag as string,
         sort: sort as any,
         search: search as string,
         isFeatured: isFeatured !== undefined ? isFeatured === 'true' : undefined,
       });
       return sendSuccess(res, result, 'Catalog retrieved successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getCuratedCollections(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const collections = await ProductService.getCuratedCollections();
+      return sendSuccess(res, { collections }, 'Curated collections retrieved successfully');
     } catch (error) {
       next(error);
     }
@@ -72,10 +83,12 @@ export class ProductController {
 
   static async listAdminProducts(req: Request, res: Response, next: NextFunction) {
     try {
-      const { search, categoryId, status, page, limit } = req.query;
+      const { search, categoryId, collection, tag, status, page, limit } = req.query;
       const result = await ProductService.listAdminProducts({
         search: search as string,
         categoryId: categoryId as string,
+        collection: collection as string,
+        tag: tag as string,
         status: status as any,
         page: page ? Number(page) : undefined,
         limit: limit ? Number(limit) : undefined,
@@ -102,6 +115,20 @@ export class ProductController {
       const product = await ProductService.toggleProductStatus(id);
       const statusLabel = product.isActive ? 'Active (Live)' : 'Draft (Hidden)';
       return sendSuccess(res, { product }, `Product visibility changed to ${statusLabel}`);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async toggleProductCollection(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const { collectionName } = req.body;
+      if (!collectionName) {
+        return res.status(400).json({ success: false, message: 'collectionName is required' });
+      }
+      const product = await ProductService.toggleProductCollection(id, collectionName);
+      return sendSuccess(res, { product }, `Collection pin updated for ${collectionName}`);
     } catch (error) {
       next(error);
     }
@@ -163,6 +190,16 @@ export class ProductController {
       const { id } = req.params;
       const result = await ProductService.deleteProduct(id);
       return sendSuccess(res, result, 'Product deleted successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async validateCart(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { variantIds } = req.body;
+      const result = await ProductService.validateCartItems(variantIds || []);
+      return sendSuccess(res, result, 'Cart validated successfully');
     } catch (error) {
       next(error);
     }

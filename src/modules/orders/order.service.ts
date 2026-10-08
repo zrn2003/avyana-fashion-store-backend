@@ -382,18 +382,31 @@ export class OrderService {
     const orders = await prisma.order.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      include: { items: true },
+      include: {
+        items: true,
+        transactions: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
     });
 
-    return orders.map((o) => ({
-      ...o,
-      shippingAddress: safeParseAddress(o.shippingAddress, {
-        street: o.shippingStreet,
-        city: o.shippingCity,
-        state: o.shippingState,
-        pincode: o.shippingPincode,
-      }),
-    }));
+    return orders.map((o) => {
+      const tx = o.transactions?.[0];
+      return {
+        ...o,
+        paymentId:
+          tx?.gatewayPaymentId ||
+          (o.upiUtrNumber ? `UPI-TXN-${o.orderNumber}` : `ORD-${o.orderNumber}`),
+        gatewayPaymentId: tx?.gatewayPaymentId || null,
+        shippingAddress: safeParseAddress(o.shippingAddress, {
+          street: o.shippingStreet,
+          city: o.shippingCity,
+          state: o.shippingState,
+          pincode: o.shippingPincode,
+        }),
+      };
+    });
   }
 
   static async fulfillOrder(orderId: string, input: FulfillOrderInput) {

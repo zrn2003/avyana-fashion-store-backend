@@ -28,6 +28,8 @@ export const createProductSchema = z.object({
   salePrice: z.number().positive('Sale price must be greater than 0').nullable().optional(),
   isFeatured: z.boolean().optional().default(false),
   isActive: z.boolean().optional().default(true),
+  tags: z.array(z.string()).optional().default([]),
+  collections: z.array(z.string()).optional().default([]),
   images: z.array(productImageInputSchema).min(1, 'At least one product image is required'),
   variants: z.array(productVariantInputSchema).min(1, 'At least one variant (size & color) is required'),
 });

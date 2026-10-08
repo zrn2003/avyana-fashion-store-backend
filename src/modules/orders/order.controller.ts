@@ -1,6 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { OrderService } from './order.service';
 import { sendSuccess } from '../../utils/response';
+import { prisma } from '../../config/prisma';
+import {
+  generateDeliveryStickerMarkdown,
+  generateTaxInvoiceMarkdown,
+  renderReceiptSvg,
+} from './orderReceipt.service';
 
 export class OrderController {
   static async createOrder(req: Request, res: Response, next: NextFunction) {
@@ -92,6 +98,75 @@ export class OrderController {
     try {
       const overview = await OrderService.getAdminOverview();
       return sendSuccess(res, overview, 'Admin overview analytics retrieved successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getOrderReceipt(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const type = (req.query.type as string) || 'all';
+      const format = (req.query.format as string) || 'json';
+
+      const order = await prisma.order.findUnique({
+        where: { id },
+        include: {
+          items: true,
+          transactions: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+        },
+      });
+
+      if (!order) {
+        return res.status(404).json({ success: false, message: 'Order not found' });
+      }
+
+      const storeSettings = await prisma.storeSetting.findFirst();
+
+      const stickerMarkdown = generateDeliveryStickerMarkdown(order, storeSettings);
+      const invoiceMarkdown = generateTaxInvoiceMarkdown(order, storeSettings);
+
+      if (format === 'svg') {
+        const doc = type === 'invoice' ? invoiceMarkdown : stickerMarkdown;
+        const svg = renderReceiptSvg(doc);
+        res.setHeader('Content-Type', 'image/svg+xml');
+        return res.send(svg);
+      }
+
+      const stickerSvg = renderReceiptSvg(stickerMarkdown);
+      const invoiceSvg = renderReceiptSvg(invoiceMarkdown);
+
+      return sendSuccess(
+        res,
+        {
+          orderNumber: order.orderNumber,
+          sticker: {
+            markdown: stickerMarkdown,
+            svg: stickerSvg,
+          },
+          invoice: {
+            markdown: invoiceMarkdown,
+            svg: invoiceSvg,
+          },
+        },
+        'ReceiptLine documents generated successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async renderCustomReceipt(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { markdown, cpl } = req.body;
+      if (!markdown || typeof markdown !== 'string') {
+        return res.status(400).json({ success: false, message: 'Markdown content is required' });
+      }
+      const svg = renderReceiptSvg(markdown, cpl ? Number(cpl) : 44);
+      return sendSuccess(res, { svg }, 'Receipt rendered successfully');
     } catch (error) {
       next(error);
     }

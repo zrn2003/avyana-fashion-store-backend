@@ -119,6 +119,9 @@ model Product {
   salePrice   Float?
   isActive    Boolean          @default(true)
   isFeatured  Boolean          @default(false)
+  tags        String[]         @default([])
+  collections String[]         @default([])
+  viewCount   Int              @default(0)
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
@@ -277,6 +280,25 @@ model StoreSetting {
   standardShippingFee   Float    @default(99.0)
   announcementText      String?  @default("Complimentary Express Delivery on orders above ₹1,499 | Handcrafted Festive Silks")
   isAnnouncementActive  Boolean  @default(true)
+  curatedCollections    String[] @default(["Festive Wear", "Monsoon Edit", "New Arrivals", "Trending Now", "Handloom Heritage"])
   updatedAt             DateTime @updatedAt
+}
+
+model AnalyticsEvent {
+  id            String   @id @default(cuid())
+  eventType     String
+  sessionId     String?
+  visitorId     String?
+  productId     String?
+  trafficSource String?
+  deviceType    String?
+  path          String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([eventType])
+  @@index([productId])
+  @@index([visitorId])
 }
 

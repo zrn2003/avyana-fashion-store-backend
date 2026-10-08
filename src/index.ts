@@ -12,6 +12,8 @@ import orderRoutes from './modules/orders/order.routes';
 import mediaRoutes from './modules/media/media.routes';
 import settingsRoutes from './modules/settings/settings.routes';
 import paymentRoutes from './modules/payments/payment.routes';
+import analyticsRoutes from './modules/analytics/analytics.routes';
+import logisticsRoutes from './modules/logistics/logistics.routes';
 
 const app = express();
 
@@ -35,9 +37,11 @@ app.use(
       const isAllowed =
         configuredOrigins.includes(origin) ||
         origin === 'http://localhost:5173' ||
+        origin === 'https://localhost:5173' ||
         origin === 'http://127.0.0.1:5173' ||
+        origin === 'https://127.0.0.1:5173' ||
         /\.vercel\.app$/.test(origin) ||
-        /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/.test(origin);
+        /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/.test(origin);
       return callback(null, isAllowed);
     },
     credentials: true,
@@ -58,6 +62,8 @@ app.use('/api/v1', orderRoutes);
 app.use('/api/v1/media', mediaRoutes);
 app.use('/api/v1', settingsRoutes);
 app.use('/api/v1/payments', paymentRoutes);
+app.use('/api/v1', analyticsRoutes);
+app.use('/api/v1/logistics', logisticsRoutes);
 
 // Production Deep Health Check with Database Probing
 app.get('/api/v1/health', async (_req: Request, res: Response) => {

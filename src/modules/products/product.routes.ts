@@ -11,8 +11,10 @@ const router = Router();
 
 // Public Catalog Endpoints (High-throughput with CDN edge cache headers)
 router.get('/products', catalogRateLimiter, publicCache(60, 300), ProductController.listProducts);
+router.post('/products/validate-cart', catalogRateLimiter, ProductController.validateCart);
 router.get('/products/:slug', catalogRateLimiter, publicCache(60, 300), ProductController.getProductBySlug);
 router.get('/categories', catalogRateLimiter, publicCache(300, 900), ProductController.listCategories);
+router.get('/collections', catalogRateLimiter, publicCache(60, 300), ProductController.getCuratedCollections);
 
 // Protected Admin Product Management Endpoints (Ensure no caching for real-time inventory)
 router.use('/admin', noCache);
@@ -51,6 +53,13 @@ router.patch(
   authenticate,
   requireRole(Role.ADMIN),
   ProductController.toggleProductStatus
+);
+
+router.patch(
+  '/admin/products/:id/toggle-collection',
+  authenticate,
+  requireRole(Role.ADMIN),
+  ProductController.toggleProductCollection
 );
 
 router.patch(

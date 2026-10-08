@@ -4,7 +4,9 @@ export interface ProductListQuery {
   page?: number;
   limit?: number;
   category?: string;
-  sort?: 'price_asc' | 'price_desc' | 'newest';
+  collection?: string;
+  tag?: string;
+  sort?: 'price_asc' | 'price_desc' | 'newest' | 'trending';
   search?: string;
   isFeatured?: boolean;
 }
@@ -22,6 +24,18 @@ export class ProductService {
     if (query.category) {
       where.category = {
         slug: query.category,
+      };
+    }
+
+    if (query.collection && query.collection !== 'all') {
+      where.collections = {
+        has: query.collection,
+      };
+    }
+
+    if (query.tag) {
+      where.tags = {
+        has: query.tag,
       };
     }
 
@@ -43,6 +57,8 @@ export class ProductService {
       orderBy = { salePrice: 'desc' };
     } else if (query.sort === 'newest') {
       orderBy = { createdAt: 'desc' };
+    } else if (query.sort === 'trending') {
+      orderBy = { viewCount: 'desc' };
     }
 
     const [products, totalItems] = await Promise.all([
@@ -97,6 +113,9 @@ export class ProductService {
         totalStock,
         isSoldOut: totalStock === 0,
         isFeatured: p.isFeatured,
+        tags: p.tags || [],
+        collections: p.collections || [],
+        viewCount: p.viewCount || 0,
       };
     });
 
@@ -113,6 +132,39 @@ export class ProductService {
         hasPrevPage: page > 1,
       },
     };
+  }
+
+  static async getCuratedCollections() {
+    const storeSetting = await prisma.storeSetting.findFirst({
+      where: { id: 'default' },
+    });
+    const defaultList = ['Festive Wear', 'Monsoon Edit', 'New Arrivals', 'Trending Now', 'Handloom Heritage'];
+    const collectionsList = (storeSetting?.curatedCollections && storeSetting.curatedCollections.length > 0)
+      ? storeSetting.curatedCollections
+      : defaultList;
+
+    const counts = await Promise.all(
+      collectionsList.map(async (col) => {
+        const count = await prisma.product.count({
+          where: {
+            isActive: true,
+            collections: { has: col },
+          },
+        });
+        return {
+          name: col,
+          slug: col,
+          count,
+        };
+      })
+    );
+
+    const totalActive = await prisma.product.count({ where: { isActive: true } });
+
+    return [
+      { name: 'All Pieces', slug: 'all', count: totalActive },
+      ...counts,
+    ];
   }
 
   static async getProductBySlug(slug: string) {
@@ -135,6 +187,14 @@ export class ProductService {
       throw error;
     }
 
+    // Increment viewCount asynchronously in background
+    prisma.product
+      .update({
+        where: { id: product.id },
+        data: { viewCount: { increment: 1 } },
+      })
+      .catch((err) => console.error('Failed to increment product viewCount:', err));
+
     const availableColors = Array.from(
       new Map(product.variants.map((v) => [v.colorName, { name: v.colorName, hex: v.colorHex }])).values()
     );
@@ -156,6 +216,9 @@ export class ProductService {
       variants: product.variants,
       availableColors,
       availableSizes,
+      tags: product.tags || [],
+      collections: product.collections || [],
+      viewCount: product.viewCount || 0,
     };
   }
 
@@ -280,6 +343,8 @@ export class ProductService {
   static async listAdminProducts(query?: {
     search?: string;
     categoryId?: string;
+    collection?: string;
+    tag?: string;
     status?: 'active' | 'draft' | 'all';
     page?: number;
     limit?: number;
@@ -297,6 +362,14 @@ export class ProductService {
 
     if (query?.categoryId && query.categoryId !== 'all') {
       where.categoryId = query.categoryId;
+    }
+
+    if (query?.collection && query.collection !== 'all') {
+      where.collections = { has: query.collection };
+    }
+
+    if (query?.tag) {
+      where.tags = { has: query.tag };
     }
 
     if (query?.search) {
@@ -379,6 +452,35 @@ export class ProductService {
     const updated = await prisma.product.update({
       where: { id },
       data: { isActive: !existing.isActive },
+      include: {
+        category: true,
+        images: { orderBy: { sortOrder: 'asc' } },
+        variants: true,
+      },
+    });
+
+    return updated;
+  }
+
+  static async toggleProductCollection(productId: string, collectionName: string) {
+    const existing = await prisma.product.findUnique({ where: { id: productId } });
+    if (!existing) {
+      const error: any = new Error('Product not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const currentCollections = existing.collections || [];
+    let updatedCollections: string[];
+    if (currentCollections.includes(collectionName)) {
+      updatedCollections = currentCollections.filter((c) => c !== collectionName);
+    } else {
+      updatedCollections = [...currentCollections, collectionName];
+    }
+
+    const updated = await prisma.product.update({
+      where: { id: productId },
+      data: { collections: updatedCollections },
       include: {
         category: true,
         images: { orderBy: { sortOrder: 'asc' } },
@@ -603,5 +705,48 @@ export class ProductService {
     });
 
     return { id, message: 'Product deleted successfully' };
+  }
+
+  static async validateCartItems(variantIds: string[]) {
+    if (!Array.isArray(variantIds) || variantIds.length === 0) {
+      return { validItems: [], removedVariantIds: [] };
+    }
+
+    const cleanIds = variantIds.filter((id) => typeof id === 'string' && id.trim().length > 0);
+    if (cleanIds.length === 0) {
+      return { validItems: [], removedVariantIds: [] };
+    }
+
+    const variants = await prisma.productVariant.findMany({
+      where: {
+        id: { in: cleanIds },
+        product: { isActive: true },
+      },
+      include: {
+        product: {
+          include: {
+            images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+          },
+        },
+      },
+    });
+
+    const validVariantIdSet = new Set(variants.map((v) => v.id));
+    const removedVariantIds = cleanIds.filter((id) => !validVariantIdSet.has(id));
+
+    const validItems = variants.map((v) => ({
+      variantId: v.id,
+      productId: v.productId,
+      productTitle: v.product.title,
+      slug: v.product.slug,
+      size: v.size,
+      colorName: v.colorName,
+      colorHex: v.colorHex || undefined,
+      unitPrice: (v.product.salePrice || v.product.basePrice) + (v.priceDelta || 0),
+      image: v.product.images[0]?.publicUrl || '',
+      maxStock: v.stockCount,
+    }));
+
+    return { validItems, removedVariantIds };
   }
 }
