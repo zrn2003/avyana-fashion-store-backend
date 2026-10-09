@@ -6,7 +6,9 @@ import { noCache } from '../../middleware/cache.middleware';
 
 const router = Router();
 
-// Public telemetry ingestion from storefront
+// Public storefront activity & telemetry ingestion (ad-blocker resilient aliases)
+router.post('/store/activity', AnalyticsController.recordEvent);
+router.post('/telemetry/event', AnalyticsController.recordEvent);
 router.post('/analytics/event', AnalyticsController.recordEvent);
 
 // Protected Admin Analytics Endpoints
