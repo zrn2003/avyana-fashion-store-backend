@@ -139,15 +139,19 @@ export function generateDeliveryStickerMarkdown(order: any, storeSettings?: any)
   const digitalReceiptUrl = `${websiteUrl}/?receipt=${encodeURIComponent(orderId)}&phone=${encodeURIComponent(customerPhone)}`;
 
   return `^^ ${storeName}
+| Handcrafted Indian Weaves & Heritage Textiles |
+| Individual Small-Scale Business • Micro Enterprise |
+| GSTIN / CIN: Not Applicable (Artisan Exempt) |
 ------------------------------------------------
-{code:${orderId}; type:CODE128; height:50}
-[C] **ORDER ID: ${orderId}**
+{code:${orderId}; option:code128,50}
+[C] **DISPATCH LABEL • ORDER ID: ${orderId}**
 ------------------------------------------------
 [L] **SHIPPED BY:**
-[L] ${storeName}
+[L] ${storeName} (Individual Micro Enterprise)
 [L] ${warehouseAddress}
+[L] GSTIN / CIN: Not Applicable (Turnover below threshold)
 
-[L] **SHIPPED FOR:**
+[L] **DELIVER TO:**
 [L] **${customerName}**
 [L] ${shippingAddress}
 [L] Phone: +91 ${customerPhone}
@@ -157,14 +161,15 @@ export function generateDeliveryStickerMarkdown(order: any, storeSettings?: any)
                [[ ${paymentActionTag} ]]
                
            ============================
-[C] Mode: ${paymentMode}
+[C] Payment Mode: ${paymentMode}
 [C] Payment ID: ${paymentId}
 [C] Payment UTR: ${paymentUtr}
 ${cashCollectionLine}
 ------------------------------------------------
-{code:${digitalReceiptUrl}; type:QR; width:45}
-[C] Scan for Digital Receipt & Tracking
-[C] Order Ref: ${orderId}
+{code:${digitalReceiptUrl}; option:qrcode}
+[C] Scan for Official Digital Receipt & Order Copy
+[C] Direct Order Verification: ${orderId}
+[C] Verified Authentic Artisan Delivery Label
 ------------------------------------------------`;
 }
 
@@ -175,7 +180,7 @@ export function generateTaxInvoiceMarkdown(order: any, storeSettings?: any): str
   const shippingAddress = formatOrderAddress(order.shippingAddress);
   const customerPhone = formatCustomerPhone(order.shippingPhone);
 
-  const websiteUrl = storeSettings?.websiteUrl || process.env.CORS_ORIGIN || 'https://avyanacraft.com';
+  const websiteUrl = storeSettings?.websiteUrl || process.env.CORS_ORIGIN || 'https://avyana-fashion-store-backend.onrender.com';
   const digitalReceiptUrl = `${websiteUrl}/?receipt=${encodeURIComponent(orderId)}&phone=${encodeURIComponent(customerPhone)}`;
 
   const orderDate = new Date(order.createdAt).toLocaleDateString('en-IN', {
@@ -203,11 +208,14 @@ export function generateTaxInvoiceMarkdown(order: any, storeSettings?: any): str
 
   return `^^ ${storeName}
 | Handloom Heritage & Luxury Artisanal Studio |
-| GSTIN: 27AABCA9081F1Z5 | CIN: U74999MH2026PTC |
+| Entity: Individual Small-Scale Business (Micro Enterprise) |
+| GSTIN: Not Applicable (Turnover Below GST Threshold) |
+| CIN: Not Applicable (Sole Proprietorship / Individual Enterprise) |
 ------------------------------------------------
-| TAX INVOICE & PAYMENT RECEIPT |
+| RETAIL SALE INVOICE & BILL OF SUPPLY |
+| Official Cash Memo & Delivery Receipt |
 | Invoice Ref: INV-${orderId} |
-| Date: ${orderDate} |
+| Order Ref: ${orderId} | Date: ${orderDate} |
 ------------------------------------------------
 | BILLED & SHIPPED TO: |
 | "${customerName}" |
@@ -221,14 +229,14 @@ ${itemsRows.length > 0 ? itemsRows.join('\n') : '| Artisanal Apparel Item | 1 | 
 ------------------------------------------------
 {border:none; width:*,14}
 Subtotal | Rs. ${subtotal.toLocaleString('en-IN')}
-Shipping Fee | ${shipping === 0 ? 'FREE' : 'Rs. ' + shipping.toLocaleString('en-IN')}
-${discount > 0 ? `Boutique Privilege Discount | -Rs. ${discount.toLocaleString('en-IN')}\n` : ''}GST (5% Included) | Rs. ${Math.round(total * 0.05).toLocaleString('en-IN')}
+Shipping Fee | ${shipping === 0 ? 'FREE Handloom Delivery' : 'Rs. ' + shipping.toLocaleString('en-IN')}
+${discount > 0 ? `Boutique Privilege Discount | -Rs. ${discount.toLocaleString('en-IN')}\n` : ''}Taxes (GST) | Rs. 0.00 (Small Business Exempt)
 ------------------------------------------------
 {border:line; width:*,16}
 ^^ NET PAYABLE | ^^Rs. ${total.toLocaleString('en-IN')}
 {border:none}
 ------------------------------------------------
-| === PAYMENT & TRANSACTION SETTLEMENT === |
+| === PAYMENT & SETTLEMENT DETAILS === |
 ------------------------------------------------
 {border:space; width:15,*}
 Payment Mode | ${paymentMode}
@@ -237,13 +245,17 @@ Payment UTR | ${paymentUtr}
 Settlement | "${settlementStatus}"
 Gross Amount | Rs. ${total.toLocaleString('en-IN')}
 ------------------------------------------------
+| DECLARATION: Small-Scale Individual Enterprise. |
+| Composition / GST Exempt. No tax charged or collected. |
+| Pure Botanical Dyes & Authentic Handcrafted Weaves |
+------------------------------------------------
 {code:${orderId}; option:code128,45}
 | Order Identifier Barcode: ${orderId} |
 ------------------------------------------------
 {code:${digitalReceiptUrl}; option:qrcode}
-| Scan QR Code for Digital Tax Invoice & Receipt |
-| Direct Verification Ref: ${orderId} |
-| Thank you for celebrating Indian handlooms! |
+| Scan for Verified Digital Receipt & Order Copy |
+| Direct Online Verification: ${orderId} |
+| Thank you for celebrating Indian Handloom Artisans! |
 ------------------------------------------------`;
 }
 

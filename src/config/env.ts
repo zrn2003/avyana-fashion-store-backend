@@ -13,7 +13,7 @@ const envSchema = z.object({
   JWT_ACCESS_EXPIRY: z.string().default('15m'),
   JWT_REFRESH_EXPIRY: z.string().default('7d'),
   GOOGLE_CLIENT_ID: z.string().optional().default(''),
-  FIREBASE_PROJECT_ID: z.string().default('avyana-craft'),
+  FIREBASE_PROJECT_ID: z.string().default('bhavana-sbs'),
   TELEGRAM_BOT_TOKEN: z.string().optional().default(''),
   TELEGRAM_CHAT_ID: z.string().optional().default(''),
   AWS_ENDPOINT_URL_S3: z.string().optional().default(''),

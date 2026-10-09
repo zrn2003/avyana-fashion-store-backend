@@ -9,7 +9,7 @@ let firestore: Firestore | null = null;
 
 try {
   app = getApps().length > 0 ? getApps()[0] : initializeApp({
-    projectId: env.FIREBASE_PROJECT_ID || 'avyana-craft',
+    projectId: env.FIREBASE_PROJECT_ID || 'bhavana-sbs',
   });
   firebaseAuth = getAuth(app);
   firestore = getFirestore(app);
